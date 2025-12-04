@@ -33,16 +33,15 @@ def predict_default_risk(session, loan_type_filter):
     from snowflake.ml.registry import Registry
     import json
     
-    # Get model from registry
-    reg = Registry(session, database_name="ORIGENCE_INTELLIGENCE", schema_name="ML_MODELS")
-    model = reg.get_model("LOAN_DEFAULT_PREDICTOR").default
+    # Get model version from registry
+    reg = Registry(session=session, database_name="ORIGENCE_INTELLIGENCE", schema_name="ML_MODELS")
+    mv = reg.get_model("LOAN_DEFAULT_PREDICTOR").default
     
-    # Build query using FEATURE VIEW (single source of truth)
+    # Build query using FEATURE VIEW (single source of truth) - exclude label and ID columns
     type_filter = f"WHERE loan_type = '{loan_type_filter}'" if loan_type_filter else ""
     
     query = f"""
     SELECT 
-        loan_id,
         loan_type,
         original_loan_amount,
         loan_term_months,
@@ -59,7 +58,7 @@ def predict_default_risk(session, loan_type_filter):
         loan_to_income_ratio
     FROM ORIGENCE_INTELLIGENCE.ANALYTICS.V_LOAN_DEFAULT_FEATURES
     {type_filter}
-    LIMIT 1000
+    LIMIT 100
     """
     
     input_df = session.sql(query)
@@ -70,10 +69,10 @@ def predict_default_risk(session, loan_type_filter):
             "loan_type_filter": loan_type_filter
         })
     
-    # Get predictions
-    predictions = model.run(input_df, function_name="predict")
+    # Get predictions using model version run method
+    predictions = mv.run(input_df, function_name="predict")
     
-    # Analyze predictions
+    # Analyze predictions - output column name from model
     result = predictions.select("PREDICTED_RISK", "LOAN_TYPE", "ORIGINAL_LOAN_AMOUNT").to_pandas()
     
     # Count by predicted risk
@@ -124,16 +123,15 @@ def predict_approval(session, status_filter):
     from snowflake.ml.registry import Registry
     import json
     
-    # Get model from registry
-    reg = Registry(session, database_name="ORIGENCE_INTELLIGENCE", schema_name="ML_MODELS")
-    model = reg.get_model("LOAN_APPROVAL_PREDICTOR").default
+    # Get model version from registry
+    reg = Registry(session=session, database_name="ORIGENCE_INTELLIGENCE", schema_name="ML_MODELS")
+    mv = reg.get_model("LOAN_APPROVAL_PREDICTOR").default
     
-    # Build query using FEATURE VIEW
+    # Build query using FEATURE VIEW - exclude label and ID columns
     status_condition = f"WHERE approval_label = 1" if status_filter == 'PENDING' else ""
     
     query = f"""
     SELECT 
-        application_id,
         loan_type,
         requested_amount,
         loan_term_months,
@@ -148,7 +146,7 @@ def predict_approval(session, status_filter):
         loan_to_income_ratio
     FROM ORIGENCE_INTELLIGENCE.ANALYTICS.V_LOAN_APPROVAL_FEATURES
     {status_condition}
-    LIMIT 1000
+    LIMIT 100
     """
     
     input_df = session.sql(query)
@@ -159,8 +157,8 @@ def predict_approval(session, status_filter):
             "status_filter": status_filter
         })
     
-    # Get predictions
-    predictions = model.run(input_df, function_name="predict")
+    # Get predictions using model version run method
+    predictions = mv.run(input_df, function_name="predict")
     
     # Analyze predictions
     result = predictions.select("PREDICTED_APPROVAL", "LOAN_TYPE", "REQUESTED_AMOUNT", "CREDIT_SCORE_AT_APP").to_pandas()
@@ -216,14 +214,13 @@ def detect_fraud(session, days_back):
     if days_back is None or days_back <= 0:
         days_back = 30
     
-    # Get model from registry
-    reg = Registry(session, database_name="ORIGENCE_INTELLIGENCE", schema_name="ML_MODELS")
-    model = reg.get_model("FRAUD_DETECTION_MODEL").default
+    # Get model version from registry
+    reg = Registry(session=session, database_name="ORIGENCE_INTELLIGENCE", schema_name="ML_MODELS")
+    mv = reg.get_model("FRAUD_DETECTION_MODEL").default
     
-    # Build query using FEATURE VIEW
+    # Build query using FEATURE VIEW - exclude label and ID columns
     query = f"""
     SELECT 
-        f.application_id,
         f.loan_type,
         f.requested_amount,
         f.credit_score_at_app,
@@ -241,7 +238,7 @@ def detect_fraud(session, days_back):
     INNER JOIN ORIGENCE_INTELLIGENCE.RAW.LOAN_APPLICATIONS a 
         ON f.application_id = a.application_id
     WHERE a.application_date >= DATEADD(day, -{days_back}, CURRENT_DATE())
-    LIMIT 1000
+    LIMIT 100
     """
     
     input_df = session.sql(query)
@@ -252,11 +249,24 @@ def detect_fraud(session, days_back):
             "days_back": days_back
         })
     
-    # Get predictions
-    predictions = model.run(input_df, function_name="predict")
+    # Get predictions using model version run method
+    predictions = mv.run(input_df, function_name="predict")
     
-    # Analyze predictions
-    result = predictions.select("PREDICTED_FRAUD_RISK", "APPLICATION_ID", "REQUESTED_AMOUNT", "CREDIT_SCORE_AT_APP").to_pandas()
+    # Analyze predictions - need to get application_id separately for reporting
+    result_with_ids = session.sql(f"""
+    SELECT 
+        f.application_id,
+        f.requested_amount,
+        f.credit_score_at_app
+    FROM ORIGENCE_INTELLIGENCE.ANALYTICS.V_FRAUD_DETECTION_FEATURES f
+    INNER JOIN ORIGENCE_INTELLIGENCE.RAW.LOAN_APPLICATIONS a 
+        ON f.application_id = a.application_id
+    WHERE a.application_date >= DATEADD(day, -{days_back}, CURRENT_DATE())
+    LIMIT 100
+    """).to_pandas()
+    
+    result = predictions.select("PREDICTED_FRAUD_RISK", "REQUESTED_AMOUNT", "CREDIT_SCORE_AT_APP").to_pandas()
+    result['APPLICATION_ID'] = result_with_ids['APPLICATION_ID']
     
     # Count by fraud risk
     clean = int((result['PREDICTED_FRAUD_RISK'] == 0).sum())
@@ -301,18 +311,18 @@ SHOW PROCEDURES IN SCHEMA ML_MODELS;
 -- ============================================================================
 
 -- Test 1: Predict default risk for all loans
--- CALL PREDICT_LOAN_DEFAULT_RISK(NULL);
+CALL PREDICT_LOAN_DEFAULT_RISK(NULL);
 
 -- Test 2: Predict default risk for auto loans only
--- CALL PREDICT_LOAN_DEFAULT_RISK('AUTO_LOAN');
+CALL PREDICT_LOAN_DEFAULT_RISK('AUTO_LOAN');
 
 -- Test 3: Predict approval for pending applications
--- CALL PREDICT_LOAN_APPROVAL('PENDING');
+CALL PREDICT_LOAN_APPROVAL('PENDING');
 
 -- Test 4: Detect fraud in last 30 days
--- CALL DETECT_FRAUD_RISK(30);
+CALL DETECT_FRAUD_RISK(30);
 
 -- Test 5: Detect fraud in last 7 days
--- CALL DETECT_FRAUD_RISK(7);
+CALL DETECT_FRAUD_RISK(7);
 
 SELECT 'Test calls ready - uncomment and run after ML models are trained' AS instruction;

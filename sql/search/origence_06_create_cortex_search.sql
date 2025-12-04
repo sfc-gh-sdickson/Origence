@@ -21,7 +21,7 @@ SHOW TABLES LIKE 'COMPLIANCE_POLICIES' IN SCHEMA RAW;
 -- ============================================================================
 CREATE OR REPLACE CORTEX SEARCH SERVICE UNDERWRITING_NOTES_SEARCH
   ON note_text
-  ATTRIBUTES application_id, loan_officer_id, note_category, decision_factor
+  ATTRIBUTES application_id, loan_officer_id, note_category
   WAREHOUSE = ORIGENCE_WH
   TARGET_LAG = '1 hour'
   COMMENT = 'Semantic search over underwriting decision notes and rationale'
@@ -33,7 +33,6 @@ AS
     loan_officer_id,
     note_date,
     note_category,
-    decision_factor,
     created_at
   FROM UNDERWRITING_NOTES;
 
@@ -97,7 +96,7 @@ SELECT PARSE_JSON(
     'ORIGENCE_INTELLIGENCE.RAW.UNDERWRITING_NOTES_SEARCH',
     '{
       "query": "credit score verification",
-      "columns": ["note_text", "note_category", "decision_factor"],
+      "columns": ["note_text", "note_category"],
       "limit": 3
     }'
   )

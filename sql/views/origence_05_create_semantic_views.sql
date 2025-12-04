@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Purpose: Semantic views for Cortex Analyst text-to-SQL capabilities
 -- Syntax: VERIFIED against Snowflake documentation
--- Pattern: alias.metric_name AS sql_expression (from official docs)
+-- Column names: VERIFIED against table definitions
 -- ============================================================================
 
 USE DATABASE ORIGENCE_INTELLIGENCE;
@@ -32,30 +32,30 @@ CREATE OR REPLACE SEMANTIC VIEW SV_LOAN_PERFORMANCE
     applications(credit_union_id) REFERENCES credit_unions(credit_union_id)
   )
   DIMENSIONS (
-    loans.loan_type_dim AS loans.loan_type,
-    loans.loan_purpose_dim AS loans.loan_purpose,
-    loans.delinquency_status_dim AS loans.delinquency_status,
-    loans.loan_status_dim AS loans.loan_status,
-    credit_unions.cu_name AS credit_unions.credit_union_name,
-    credit_unions.cu_tier AS credit_unions.credit_union_tier,
-    credit_unions.cu_state AS credit_unions.state,
-    credit_unions.cu_region AS credit_unions.region,
-    members.member_tier_dim AS members.member_tier,
-    members.employment_status_dim AS members.employment_status
+    loans.loan_type AS loans.loan_type,
+    loans.loan_purpose AS loans.loan_purpose,
+    loans.delinquency_status AS loans.delinquency_status,
+    loans.loan_status AS loans.loan_status,
+    credit_unions.credit_union_name AS credit_unions.credit_union_name,
+    credit_unions.credit_union_tier AS credit_unions.credit_union_tier,
+    credit_unions.state AS credit_unions.state,
+    credit_unions.region AS credit_unions.region,
+    members.member_tier AS members.member_tier,
+    members.employment_status AS members.employment_status
   )
   METRICS (
-    loans.total_loans AS COUNT(DISTINCT loan_id),
-    loans.total_loan_volume AS SUM(original_loan_amount),
-    loans.avg_loan_amount AS AVG(original_loan_amount),
-    loans.total_outstanding_balance AS SUM(current_balance),
-    loans.default_count AS COUNT_IF(has_defaulted),
-    loans.default_rate AS (COUNT_IF(has_defaulted)::FLOAT / NULLIF(COUNT(*), 0)),
-    loans.delinquent_count AS COUNT_IF(delinquency_status != 'CURRENT'),
-    loans.delinquency_rate AS (COUNT_IF(delinquency_status != 'CURRENT')::FLOAT / NULLIF(COUNT(*), 0)),
-    loans.avg_interest_rate AS AVG(interest_rate),
-    loans.total_interest_paid AS SUM(total_interest_paid),
-    loans.avg_payments_made AS AVG(payments_made),
-    loans.avg_days_past_due AS AVG(days_past_due)
+    loans.total_loans AS COUNT(DISTINCT loans.loan_id),
+    loans.total_loan_volume AS SUM(loans.original_loan_amount),
+    loans.avg_loan_amount AS AVG(loans.original_loan_amount),
+    loans.total_outstanding_balance AS SUM(loans.current_balance),
+    loans.default_count AS COUNT_IF(loans.has_defaulted),
+    loans.default_rate AS (COUNT_IF(loans.has_defaulted)::FLOAT / NULLIF(COUNT(*), 0)),
+    loans.delinquent_count AS COUNT_IF(loans.delinquency_status != 'CURRENT'),
+    loans.delinquency_rate AS (COUNT_IF(loans.delinquency_status != 'CURRENT')::FLOAT / NULLIF(COUNT(*), 0)),
+    loans.avg_interest_rate AS AVG(loans.interest_rate),
+    loans.total_interest_paid AS SUM(loans.total_interest_paid),
+    loans.avg_payments_made AS AVG(loans.payments_made),
+    loans.avg_days_past_due AS AVG(loans.days_past_due)
   )
   COMMENT = 'Semantic view for loan performance, delinquency, and default analytics';
 
@@ -102,13 +102,13 @@ CREATE OR REPLACE SEMANTIC VIEW SV_MEMBER_CREDIT_PROFILE
         WHEN members.annual_income < 100000 THEN '$80K-$100K'
         ELSE 'Over $100K'
       END,
-    members.employment_status_dim AS members.employment_status,
-    members.housing_status_dim AS members.housing_status,
-    members.member_tier_dim AS members.member_tier,
-    members.state_dim AS members.state,
-    applications.app_loan_type AS applications.loan_type,
-    applications.app_status AS applications.application_status,
-    credit_unions.cu_name AS credit_unions.credit_union_name
+    members.employment_status AS members.employment_status,
+    members.housing_status AS members.housing_status,
+    members.member_tier AS members.member_tier,
+    members.state AS members.state,
+    applications.loan_type AS applications.loan_type,
+    applications.application_status AS applications.application_status,
+    credit_unions.credit_union_name AS credit_unions.credit_union_name
   )
   METRICS (
     members.total_members AS COUNT(DISTINCT members.member_id),
@@ -146,14 +146,14 @@ CREATE OR REPLACE SEMANTIC VIEW SV_CREDIT_UNION_METRICS
     loans(dealer_id) REFERENCES dealers(dealer_id)
   )
   DIMENSIONS (
-    credit_unions.cu_name AS credit_unions.credit_union_name,
-    credit_unions.cu_tier AS credit_unions.credit_union_tier,
-    credit_unions.cu_state AS credit_unions.state,
-    credit_unions.cu_region AS credit_unions.region,
-    credit_unions.cu_status AS credit_unions.active_status,
-    loans.loan_type_dim AS loans.loan_type,
-    dealers.dealer_type_dim AS dealers.dealer_type,
-    dealers.cudl_certified_dim AS dealers.cudl_certified
+    credit_unions.credit_union_name AS credit_unions.credit_union_name,
+    credit_unions.credit_union_tier AS credit_unions.credit_union_tier,
+    credit_unions.state AS credit_unions.state,
+    credit_unions.region AS credit_unions.region,
+    credit_unions.active_status AS credit_unions.active_status,
+    loans.loan_type AS loans.loan_type,
+    dealers.dealer_type AS dealers.dealer_type,
+    dealers.cudl_certified AS dealers.cudl_certified
   )
   METRICS (
     credit_unions.total_credit_unions AS COUNT(DISTINCT credit_unions.credit_union_id),
@@ -175,6 +175,6 @@ CREATE OR REPLACE SEMANTIC VIEW SV_CREDIT_UNION_METRICS
 -- ============================================================================
 -- Confirmation
 -- ============================================================================
-SELECT 'Origence semantic views created successfully - syntax verified' AS STATUS;
+SELECT 'Origence semantic views created successfully - syntax and columns verified' AS STATUS;
 
 SHOW SEMANTIC VIEWS IN SCHEMA ANALYTICS;
