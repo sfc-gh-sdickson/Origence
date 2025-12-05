@@ -65,7 +65,7 @@ def predict_default_risk(session, loan_type_filter):
         loan_to_income_ratio
     FROM ORIGENCE_INTELLIGENCE.ANALYTICS.V_LOAN_DEFAULT_FEATURES
     {type_filter}
-    LIMIT 100
+    LIMIT 5
     """
     
     input_df = session.sql(query)
@@ -153,7 +153,7 @@ def predict_approval(session, status_filter):
         loan_to_income_ratio
     FROM ORIGENCE_INTELLIGENCE.ANALYTICS.V_LOAN_APPROVAL_FEATURES
     {status_condition}
-    LIMIT 100
+    LIMIT 5
     """
     
     input_df = session.sql(query)
@@ -245,7 +245,7 @@ def detect_fraud(session, days_back):
     INNER JOIN ORIGENCE_INTELLIGENCE.RAW.LOAN_APPLICATIONS a 
         ON f.application_id = a.application_id
     WHERE a.application_date >= DATEADD(day, -{days_back}, CURRENT_DATE())
-    LIMIT 100
+    LIMIT 5
     """
     
     input_df = session.sql(query)
@@ -269,7 +269,7 @@ def detect_fraud(session, days_back):
     INNER JOIN ORIGENCE_INTELLIGENCE.RAW.LOAN_APPLICATIONS a 
         ON f.application_id = a.application_id
     WHERE a.application_date >= DATEADD(day, -{days_back}, CURRENT_DATE())
-    LIMIT 100
+    LIMIT 5
     """).to_pandas()
     
     result = predictions.select("PREDICTED_FRAUD_RISK", "REQUESTED_AMOUNT", "CREDIT_SCORE_AT_APP").to_pandas()
