@@ -11,6 +11,13 @@ USE SCHEMA ML_MODELS;
 USE WAREHOUSE ORIGENCE_WH;
 
 -- ============================================================================
+-- Drop existing procedures to ensure clean recreation
+-- ============================================================================
+DROP PROCEDURE IF EXISTS PREDICT_LOAN_DEFAULT_RISK(VARCHAR);
+DROP PROCEDURE IF EXISTS PREDICT_LOAN_APPROVAL(VARCHAR);
+DROP PROCEDURE IF EXISTS DETECT_FRAUD_RISK(NUMBER);
+
+-- ============================================================================
 -- Procedure 1: Loan Default Risk Prediction
 -- ============================================================================
 -- Model: LOAN_DEFAULT_PREDICTOR
